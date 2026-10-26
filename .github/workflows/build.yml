@@ -1,0 +1,72 @@
+name: Build org index
+
+on:
+  schedule:
+    - cron: "27 4 * * *"        # daily 04:27 UTC
+  push:
+    branches: [main]
+  workflow_dispatch:
+  repository_dispatch:
+    types: [refresh]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # EXTENSION_DEPLOY_KEY is the private half of a read-only deploy key on
+      # coatless/quarto-org-index. It can read that one repository and does not
+      # expire. The host key below is GitHub's published ed25519 key.
+      - name: Fetch private quarto-org-index extension
+        env:
+          DEPLOY_KEY: ${{ secrets.EXTENSION_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh _extensions/coatless
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/org_index_key
+          chmod 600 ~/.ssh/org_index_key
+          echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" >> ~/.ssh/known_hosts
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/org_index_key -o IdentitiesOnly=yes" \
+            git clone --depth 1 git@github.com:coatless/quarto-org-index.git \
+            _extensions/coatless/quarto-org-index
+          rm -rf _extensions/coatless/quarto-org-index/.git ~/.ssh/org_index_key
+
+      - uses: quarto-dev/quarto-actions/setup@v2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python deps
+        run: pip install requests pyyaml
+
+      - name: Generate index.qmd with inline listing (before render)
+        env:
+          ORG_NAME: ${{ github.repository_owner }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python _extensions/coatless/quarto-org-index/fetch.py
+
+      - name: Render Quarto site
+        run: quarto render
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

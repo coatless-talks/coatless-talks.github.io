@@ -1,0 +1,8 @@
+_extensions/coatless/quarto-org-index/
+_site/
+.quarto/
+.cache/
+.DS_Store
+
+/.quarto/
+**/*.quarto_ipynb
