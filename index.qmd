@@ -1,0 +1,13 @@
+---
+title: "Coatless Talks"
+listing:
+  contents: []
+  type: grid
+  template: _extensions/coatless/quarto-org-index/templates/project-card.ejs
+  sort: "date desc"
+  sort-ui: false
+  filter-ui: false
+page-layout: full
+---
+
+Slides and materials from talks and guest lectures.
